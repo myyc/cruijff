@@ -1,4 +1,4 @@
-from hashlib import sha3_256
+from hashlib import sha256
 import json
 
 from redis import StrictRedis
@@ -8,8 +8,11 @@ def cache(f):
     def g(*args, **kwargs):
         r = StrictRedis()
         force = kwargs.pop("force") if "force" in kwargs else False
-        key = (f.__name__ + "|" + ",".join(args) + "|" + repr(kwargs))
-        key = sha3_256(key.encode("utf-8")).hexdigest()
+
+        key = json.dumps({"func": f.__name__,
+                          "args": repr(args),
+                          "kwargs": repr(kwargs)})
+        key = sha256(key.encode("utf-8")).hexdigest()
 
         if force and key in r:
             del r[key]
