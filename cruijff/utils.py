@@ -1,10 +1,12 @@
 from hashlib import sha256
 import json
+from functools import wraps
 
 from redis import StrictRedis
 
 
 def cache(f):
+    @wraps(f)
     def g(*args, **kwargs):
         r = StrictRedis()
         force = kwargs.pop("force") if "force" in kwargs else False

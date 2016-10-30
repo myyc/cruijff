@@ -1,5 +1,5 @@
 from setuptools import setup
-from cruijff._version import __version__
+from cruijff.constants import __version__
 
 
 DESC = """
@@ -22,5 +22,5 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     install_requires=["requests", "pandas", "redis", "bs4", "sqlalchemy",
-                      "mysqlclient"],
+                      "mysqlclient", "appdirs"],
 )

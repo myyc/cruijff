@@ -4,6 +4,7 @@ import requests
 import bs4
 
 from .utils import cache, legit_header
+from .constants import YEAR
 
 
 def _check_fmt(fmt):
@@ -12,7 +13,7 @@ def _check_fmt(fmt):
 
 
 @cache
-def get_comps(which="leagues", force=False, fmt="pandas"):
+def get_comps(which="leagues", fmt="pandas"):
     if which not in {"leagues", "cups"}:
         raise ValueError("'which' must be 'cups' or 'leagues'")
     _check_fmt(fmt)
@@ -46,22 +47,25 @@ def get_comps(which="leagues", force=False, fmt="pandas"):
                  "tid": k["name"].split(":")[-1],
                  "name": k.text,
                  "href": k["href"],
+                 "league": which == "leagues"
                  }
             l.append(d)
     elif fmt == "sql":
-        l = {"cols": ["id", "tid", "name", "href"], "data": []}
+        l = {"cols": ["id", "tid", "name", "league", "href"], "data": []}
 
         for k in ls:
             l["data"].append((int(k["href"].split("/")[-2]),
                               k["name"].split(":")[-1],
                               k.text,
-                              k["href"]))
+                              which == "leagues",
+                              k["href"],
+                              ))
 
     return l
 
 
 @cache
-def get_clubs(league, year=2016, force=False, fmt="pandas"):
+def get_clubs(league, year=YEAR, fmt="pandas"):
     _check_fmt(fmt)
     h = requests.get((
                          "http://www.espnfc.us/lols/{league}/table?"
@@ -102,7 +106,7 @@ def get_clubs(league, year=2016, force=False, fmt="pandas"):
 
 
 @cache
-def get_games(cid, lid, year=2016, upc=True, force=False, fmt="pandas"):
+def get_games(cid, lid, year=YEAR, upc=True, fmt="pandas"):
     _check_fmt(fmt)
 
     url = ("http://www.espnfc.us/club/j/{cid}/"
@@ -114,13 +118,13 @@ def get_games(cid, lid, year=2016, upc=True, force=False, fmt="pandas"):
     b = bs4.BeautifulSoup(h, "html.parser")
 
     rx = re.compile("([0-9]*)\.png")
+    rix = re.compile("default-team-logo-(500)")
 
     srx = re.compile(r"^[0-9]+|[0-9]+$")
     prx = re.compile("\(([0-9]*)\)")
 
     l = []
 
-    # useless, to be changed
     lgs = get_comps("leagues") + get_comps("cups")
     lgs = {k["name"]: {"id": k["id"], "tid": k["tid"]} for k in lgs}
 
@@ -129,9 +133,15 @@ def get_games(cid, lid, year=2016, upc=True, force=False, fmt="pandas"):
             continue
 
         g = {"id": int(m["data-gameid"]),
-             "time": m.find("div", class_="gmt-time")["data-time"],
              "year": year}
 
+        try:
+            time = m.find("div", class_="gmt-time").get("data-time")
+        except AttributeError:
+            print("No time found for game {}".format(g["id"]))
+            time = None
+
+        g["time"] = time
         s = m.find("div", class_="status")
         if s is not None:
             g["status"] = s.text
@@ -141,12 +151,15 @@ def get_games(cid, lid, year=2016, upc=True, force=False, fmt="pandas"):
 
         g["comp_name"] = cname
         g["comp_tid"] = comp.get("tid")
-        g["comp_id"] = comp.get("id")
+        g["comp_id"] = comp.get("id") or -1
 
         for k in {"home", "away"}:
             ht = m.find("div", class_="score-{}-team".format(k))
             g["{}_name".format(k)] = ht.find("img")["alt"]
-            g["{}_id".format(k)] = int(rx.findall(ht.find("img")["src"])[0])
+            if len(rix.findall(ht.find("img")["src"])) == 0:
+                g["{}_id".format(k)] = int(rx.findall(ht.find("img")["src"])[0])
+            else:
+                g["{}_id".format(k)] = -1
             if "upcoming" not in m["class"]:
                 score = m.find("span", class_="{}-score".format(k)).text
 

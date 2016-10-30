@@ -1,9 +1,11 @@
 import getpass
+import logging as log
 
 import pandas as pd
 from sqlalchemy import *
 
 from .getters import get_comps, get_clubs, get_games
+from .constants import YEAR
 
 
 def _get_engine():
@@ -17,6 +19,10 @@ def _get_md():
 
 def eq(q):
     return pd.read_sql(q, _get_engine())
+
+
+def connect():
+    return _get_engine().begin()
 
 
 def any_table(t, action="get"):
@@ -45,6 +51,7 @@ def comps_table(action="get"):
                      nullable=False, autoincrement=False),
               Column("tid", Text),
               Column("name", Text),
+              Column("league", Boolean),
               Column("href", Text),
               ) if action == "create" else Table("comps", m)
 
@@ -53,18 +60,18 @@ def comps_table(action="get"):
             conn.execute("delete from espn.comps")
             leagues = get_comps(fmt="sql")["data"]
             cups = get_comps("cups", fmt="sql")["data"]
-            q = "insert into espn.comps values (%s, %s, %s, %s)"
+            q = "insert into espn.comps values (%s, %s, %s, %s, %s)"
             for r in leagues + cups:
                 try:
                     conn.execute(q, r)
-                except:
-                    print(r)
+                except Exception as e:
+                    log.warning(e)
                     pass
     else:
         return any_table(t, action)
 
 
-def clubs_table(action="get", league=None, year=2016):
+def clubs_table(action="get", league=None, year=YEAR):
     m = _get_md()
     t = Table("clubs", m,
               Column("id", Integer, primary_key=True,
@@ -91,14 +98,14 @@ def clubs_table(action="get", league=None, year=2016):
                 try:
                     conn.execute(q2, *(r[0], league, year))
                     conn.execute(q, r)
-                except:
-                    print(r)
+                except Exception as e:
+                    log.warning(e)
                     pass
     else:
         return any_table(t, action)
 
 
-def games_table(action="get", lid=None, cid=None, year=2016):
+def games_table(action="get", lid=None, cid=None, year=YEAR):
     m = _get_md()
     t = Table("games", m,
               Column("id", Integer, primary_key=True,
@@ -120,21 +127,56 @@ def games_table(action="get", lid=None, cid=None, year=2016):
               ) if action == "create" else Table("games", m)
 
     if action == "fill":
-        if cid is None or lid is None:
-            raise ValueError("'cid' and 'lid' can not be empty for 'fill'.")
+        if lid is None and cid is None:
+            raise ValueError("I need at least 'lid' or 'cid'.")
         with _get_engine().begin() as conn:
-            conn.execute("delete from espn.games where (away_id = %s "
-                         "or home_id = %s) and comp_id = %s "
-                         "and status is null", cid, cid, lid)
+            if cid is None:
+                ids = cids(lid=lid, year=year)
+            elif lid is None:
+                ids = [cid]
+                lid = 0
 
-            d = get_games(fmt="sql", year=year, cid=cid, lid=lid)
-            q = ("insert into espn.games values (%s, %s, %s, %s, %s, %s, %s, "
-                 "%s, %s, %s, %s, %s, %s, %s, %s)")
-            for r in d["data"]:
-                try:
-                    conn.execute(q, r)
-                except:
-                    print(r)
-                    pass
+            for cid in ids:
+                conn.execute("delete from espn.games where (away_id = %s "
+                             "or home_id = %s) and comp_id = %s "
+                             "and status is null", cid, cid, lid)
+
+                # micro-optimisation
+                ids = gids(cid=cid, lid=lid, year=year)
+
+                d = get_games(fmt="sql", year=year, cid=cid, lid=lid)
+                q = ("insert into espn.games values (%s, %s, %s, %s, %s, %s,"
+                     " %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+
+                for r in d["data"]:
+                    if r[0] in ids:
+                        continue
+                    try:
+                        conn.execute(q, r)
+                    except Exception as e:
+                        log.warning(e)
+                        pass
     else:
         return any_table(t, action)
+
+
+def gids(lid, cid=None, year=YEAR):
+    with _get_engine().begin() as conn:
+        if cid is None:
+            s = text("select id from espn.games "
+                     "where comp_id = :c and status is not null "
+                     "and year = :y")
+            return {i[0] for i in conn.execute(s, c=lid, y=year).fetchall()}
+        else:
+            s = text("select id from espn.games "
+                     "where (away_id = :p or home_id = :p) and comp_id = :c "
+                     "and status is not null and year = :y")
+            return {i[0] for i in conn.execute(s, p=cid, c=lid,
+                                               y=year).fetchall()}
+
+
+def cids(lid, year=YEAR):
+    with _get_engine().begin() as conn:
+        s = text("select id from espn.comps_year "
+                 "where year = :y and lid = :c")
+        return {i[0] for i in conn.execute(s, c=lid, y=year).fetchall()}
