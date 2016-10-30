@@ -106,7 +106,7 @@ def gparse(gid, pos=False):
     srx = re.compile(r"^[0-9]+|[0-9]+$")
     prx = re.compile("\(([0-9]*)\)")
 
-    g = {}
+    g = {"_id": gid}
     for c in r:
         if c.tag == "teams":
             for t in c:
