@@ -4,8 +4,8 @@ import logging as log
 import pandas as pd
 from sqlalchemy import *
 
+from cruijff.constants import YEAR
 from .getters import get_comps, get_clubs, get_games
-from .constants import YEAR
 
 
 def _get_engine():
@@ -132,6 +132,9 @@ def games_table(action="get", lid=None, cid=None, year=YEAR):
         with _get_engine().begin() as conn:
             if cid is None:
                 ids = cids(lid=lid, year=year)
+                if len(ids) == 0:
+                    raise ValueError("No clubs found for year {}. "
+                                     "Fill the table maybe?".format(year))
             elif lid is None:
                 ids = [cid]
                 lid = 0
@@ -139,23 +142,23 @@ def games_table(action="get", lid=None, cid=None, year=YEAR):
             for cid in ids:
                 conn.execute("delete from espn.games where (away_id = %s "
                              "or home_id = %s) and comp_id = %s "
-                             "and status is null", cid, cid, lid)
-
-                # micro-optimisation
-                ids = gids(cid=cid, lid=lid, year=year)
+                             "and status is null and year = %s", cid, cid,
+                             lid, year)
 
                 d = get_games(fmt="sql", year=year, cid=cid, lid=lid)
                 q = ("insert into espn.games values (%s, %s, %s, %s, %s, %s,"
                      " %s, %s, %s, %s, %s, %s, %s, %s, %s)")
 
                 for r in d["data"]:
-                    if r[0] in ids:
-                        continue
                     try:
                         conn.execute(q, r)
                     except Exception as e:
                         log.warning(e)
                         pass
+
+            if year != YEAR:
+                conn.execute("delete from espn.games where year = %s and "
+                             "status is null", year)
     else:
         return any_table(t, action)
 

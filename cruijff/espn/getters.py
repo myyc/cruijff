@@ -1,10 +1,10 @@
 import re
 
-import requests
 import bs4
+import requests
 
+from cruijff.constants import YEAR
 from .utils import cache, legit_header
-from .constants import YEAR
 
 
 def _check_fmt(fmt):
@@ -74,7 +74,7 @@ def get_clubs(league, year=YEAR, fmt="pandas"):
                      headers=legit_header()).text
     b = bs4.BeautifulSoup(h, "html.parser")
 
-    ls = b.find("li", attrs={"data-section": "clubs"}).find("ul").children
+    ls = b.find_all("td", attrs={"class": "team"})
 
     l = None
 
@@ -82,11 +82,9 @@ def get_clubs(league, year=YEAR, fmt="pandas"):
         l = []
 
         for k in ls:
-            if k.name != "li":
-                continue
             k = k.find("a")
             d = {"id": int(k["href"].split("/")[-2]),
-                 "tid": k["name"].split(":")[-1],
+                 "tid": k["href"].split("/")[-3],
                  "name": k.text,
                  "href": k["href"]}
             l.append(d)
@@ -94,11 +92,9 @@ def get_clubs(league, year=YEAR, fmt="pandas"):
         l = {"cols": ["id", "tid", "name", "href"], "data": []}
 
         for k in ls:
-            if k.name != "li":
-                continue
             k = k.find("a")
             l["data"].append((int(k["href"].split("/")[-2]),
-                              k["name"].split(":")[-1],
+                              k["href"].split("/")[-3],
                               k.text,
                               k["href"]))
 
@@ -162,10 +158,11 @@ def get_games(cid, lid, year=YEAR, upc=True, fmt="pandas"):
                 g["{}_id".format(k)] = -1
             if "upcoming" not in m["class"]:
                 score = m.find("span", class_="{}-score".format(k)).text
+                p = prx.findall(score)
 
-                if g["status"] == "FT-Pens":
+                if p:
                     g["{}_score".format(k)] = int(srx.findall(score)[0])
-                    g["{}_score_pens".format(k)] = int(prx.findall(score)[0])
+                    g["{}_score_pens".format(k)] = int(p[0])
                 else:
                     g["{}_score".format(k)] = int(score)
 

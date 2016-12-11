@@ -1,6 +1,6 @@
 from setuptools import setup
-from cruijff.constants import __version__
 
+from .cruijff.constants import __version__
 
 DESC = """
 TBD
@@ -22,5 +22,6 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     install_requires=["requests", "pandas", "redis", "bs4", "sqlalchemy",
-                      "mysqlclient", "appdirs", "pymongo"],
+                      "mysqlclient", "appdirs", "pymongo", "cherrypy",
+                      "jinja2"],
 )

@@ -1,19 +1,20 @@
-import urllib
-import os
-import io
-import logging as log
-import re
+import base64
+import bz2
 import fnmatch
 import html
-import bz2
-import base64
+import io
+import logging as log
+import os
+import re
+import urllib
 
 import appdirs
 import numpy as np
 from lxml import etree as ET
 
+from cruijff.constants import YEAR
 from .dbutils import gids
-from .constants import YEAR
+from .metadata import Game
 
 
 def get_cachep(tl=False):
@@ -106,12 +107,15 @@ def gparse(gid, pos=False):
     srx = re.compile(r"^[0-9]+|[0-9]+$")
     prx = re.compile("\(([0-9]*)\)")
 
+    sides = {}
+
     g = {"_id": gid}
     for c in r:
         if c.tag == "teams":
             for t in c:
                 g[t.tag] = {"id": int(t.attrib["id"]),
                             "name": html.unescape(t.text)}
+                sides[int(t.attrib["id"])] = t.tag
         elif c.tag == "shots":
             g["shots"] = []
             l = g["shots"]
@@ -186,10 +190,16 @@ def gparse(gid, pos=False):
                              "data": grid_encode(grid)}
                 p.append(d)
             g["pos"] = p
+
+        for t in {"shots", "pos"}:
+            if t in g:
+                for s in g[t]:
+                    s["side"] = sides[s["teamid"]]
+
     return g
 
 
-def tparse(gid):
+def tparse(gid, md=False):
     p = "{}/{}.xml".format(get_cachep(tl=True), gid)
 
     if not os.path.exists(p):
@@ -233,4 +243,12 @@ def tparse(gid):
         tl.append(d)
 
     g["tl"] = tl
+
+    if md:
+        gmd = Game.from_db(gid)
+        meta = {"year": gmd.year, "comp": gmd.league.id,
+                "time": gmd.time}
+
+        g["meta"] = meta
+
     return g
