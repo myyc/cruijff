@@ -1,6 +1,6 @@
 from setuptools import setup
 
-from .cruijff.constants import __version__
+from cruijff.constants import __version__
 
 DESC = """
 TBD
