@@ -1,6 +1,6 @@
 from setuptools import setup
 
-from .cruijff.constants import __version__
+from cruijff.constants import __version__
 
 DESC = """
 TBD
@@ -14,7 +14,7 @@ setup(
     description="Some football data",
     license="BSD",
     keywords="data mining football python pandas mysql mongodb",
-    packages=["cruijff"],
+    packages=["cruijff", "cruijff.espn", "cruijff.opta"],
     long_description=DESC,
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
@@ -22,6 +22,6 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     install_requires=["requests", "pandas", "redis", "bs4", "sqlalchemy",
-                      "mysqlclient", "appdirs", "pymongo", "cherrypy",
-                      "jinja2"],
+                      "mysqlclient", "appdirs", "pymongo", "pendulum",
+                      "mnemon"],
 )
