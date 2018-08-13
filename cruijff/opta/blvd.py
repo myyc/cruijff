@@ -29,7 +29,7 @@ def _dec(s):
 
 
 def odate(ts):
-    dt = pendulum.parse(ts).timezone_("Europe/London")
+    dt = pendulum.parse(ts).in_timezone("Europe/London")
     dt = pendulum.timezone("Europe/Rome").convert(dt)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
