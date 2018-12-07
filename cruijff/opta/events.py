@@ -50,7 +50,8 @@ def jevs(gs, fev=None):
 
             d.update(pid=pid, event=et, x=ea["x"], y=ea["y"],
                      tid=int(ea["team_id"]), p=int(ea["period_id"]),
-                     m=int(ea["min"]), s=int(ea["sec"]), eid=int(ea["id"]))
+                     m=int(ea["min"]), s=int(ea["sec"]), eid=int(ea["id"]),
+                     meid=int(ea["event_id"]))
             d.update(**gatt)
 
             qs = {}

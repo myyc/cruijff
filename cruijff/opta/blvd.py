@@ -10,7 +10,6 @@ from redis import Redis
 import pandas as pd
 from pymongo import MongoClient
 import pymongo.errors as merr
-from mnemon import mnd
 
 
 from ..constants import YEAR
